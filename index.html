@@ -50,46 +50,46 @@
     pointer-events:none;
   }
   .card.show{
-    width:min(380px,42vw);
+    width:min(460px,48vw);
     margin-right:32px;
     opacity:1;
     pointer-events:auto;
   }
   /* ancho fijo interno: el texto nunca se reajusta, solo se revela */
-  .card-inner{ width:min(380px,42vw); }
+  .card-inner{ width:min(460px,48vw); }
   .card h1{
     font-family:'EB Garamond', serif;
     font-variant:small-caps;
     font-weight:600;
     color:var(--ink);
-    font-size:1.5rem;
+    font-size:1.75rem;
     letter-spacing:.3px;
-    margin-bottom:6px;
+    margin-bottom:8px;
     line-height:1.35;
   }
   .card .to{
     font-family:'Dancing Script', cursive;
     font-weight:700;
-    font-size:1.8rem;
+    font-size:2.1rem;
     color:var(--ink);
-    margin-bottom:14px;
+    margin-bottom:16px;
     line-height:1;
   }
   .card p{
     font-family:'EB Garamond', serif;
     font-variant:small-caps;
     font-weight:500;
-    font-size:1.15rem;
-    line-height:1.5;
+    font-size:1.3rem;
+    line-height:1.55;
     color:var(--ink);
     margin-bottom:0;
   }
   .card .signature{
     font-family:'Dancing Script', cursive;
     font-weight:700;
-    font-size:1.45rem;
+    font-size:1.65rem;
     color:var(--ink);
-    margin-top:16px;
+    margin-top:18px;
   }
 
   /* ---- linea de suelo compartida entre la carta y el arbol ---- */
@@ -103,11 +103,17 @@
   }
 
   /* ---- escenario canvas ---- */
-  .stage-wrap{ flex:1 1 320px; display:flex; flex-direction:column; align-items:center; }
+  .stage-wrap{ flex:0 1 420px; display:flex; flex-direction:column; align-items:center; }
   .canvas-wrapper{
     position:relative;
     width:100%;
     max-width:420px;
+    transition:max-width 1.15s cubic-bezier(.16,1,.3,1), opacity 1s ease;
+  }
+  /* una vez aparece el texto, el arbol se achica y pasa a un segundo plano */
+  .canvas-wrapper.secondary{
+    max-width:300px;
+    opacity:.92;
   }
   canvas{
     display:block;
@@ -188,13 +194,25 @@
   const hint = document.getElementById('hint');
   const container = document.getElementById('container');
   const sharedGround = document.getElementById('sharedGround');
+  const canvasWrapper = document.getElementById('canvasWrapper');
   const W = canvas.width, H = canvas.height;
 
+  // ===================================================================
+  // AJUSTES DE TAMAÑO DEL ÁRBOL Y EL CORAZÓN (edita estos numeros)
+  //   groundY       -> a que altura esta el suelo (0=arriba, 700=abajo)
+  //   trunkTip.y    -> que tan ALTO llega el tronco. Numero MAS CHICO
+  //                    = tronco MAS LARGO/ALTO. Numero MAS GRANDE
+  //                    (mas cerca de groundY) = tronco MAS CORTO.
+  //   heartCenterY  -> posicion vertical del CENTRO del corazon de
+  //                    girasoles. Numero mas chico = corazon mas arriba.
+  //   heartScale    -> tamaño (ancho y alto) del corazon completo.
+  //                    Numero mas grande = corazon mas grande.
+  // El canvas interno mide 600 de ancho x 700 de alto.
+  // ===================================================================
   const groundY = 640;
   const trunkBase = { x: 300, y: groundY };
-  const trunkTip  = { x: 300, y: 355 };
-  // el corazon queda metido dentro de las ramas, no flotando encima
-  const heartCenterX = 300, heartCenterY = 163, heartScale = 11.6;
+  const trunkTip  = { x: 300, y: 355 };   // <- sube/baja el tronco aqui
+  const heartCenterX = 300, heartCenterY = 163, heartScale = 11.6; // <- tamaño del corazon aqui
 
   function lerp(a,b,t){ return a + (b-a)*t; }
   function lerpPoint(a,b,t){ return { x: lerp(a.x,b.x,t), y: lerp(a.y,b.y,t) }; }
@@ -398,7 +416,10 @@
       f.vx = side * (60 + Math.random()*70);
       f.vy = -(30 + Math.random()*50);
     });
-    setTimeout(()=> card.classList.add('show'), 300);
+    setTimeout(()=>{
+      card.classList.add('show');
+      canvasWrapper.classList.add('secondary');
+    }, 300);
   }
 
   function update(dt){
@@ -472,16 +493,13 @@
 
     if(state === 'GROWING' || state === 'BLOOMING' || state === 'WIND' || state === 'DONE'){
       const trunkT = Math.min(growElapsed/TRUNK_MS, 1);
-      if(state === 'GROWING'){
-        const branchTs = branches.map((b,i)=>{
-          const start = TRUNK_MS + i*BRANCH_STAGGER;
-          return Math.max(0, Math.min((growElapsed-start)/BRANCH_MS, 1));
-        });
-        drawTree(trunkT, branchTs);
-      } else {
-        // una vez florece, las ramas quedan tapadas por las flores (solo tronco visible)
-        drawTree(1, branches.map(()=>0));
-      }
+      const branchTs = branches.map((b,i)=>{
+        const start = TRUNK_MS + i*BRANCH_STAGGER;
+        return Math.max(0, Math.min((growElapsed-start)/BRANCH_MS, 1));
+      });
+      // las ramas quedan siempre visibles, tanto durante el crecimiento
+      // como despues de florecer (no se ocultan)
+      drawTree(state === 'GROWING' ? trunkT : 1, state === 'GROWING' ? branchTs : branches.map(()=>1));
     }
 
     if(state === 'BLOOMING' || state === 'WIND' || state === 'DONE'){
@@ -546,6 +564,7 @@
     petals = []; petalTimer = 900;
     buildHeart();
     card.classList.remove('show');
+    canvasWrapper.classList.remove('secondary');
     hint.classList.remove('fade-out');
   }
   document.getElementById('replay').addEventListener('click', resetAll);
